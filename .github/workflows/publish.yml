@@ -58,6 +58,7 @@ jobs:
       - name: Download artifact
         uses: actions/download-artifact@v5
         with:
+          name: dist
           path: .
 
       - name: Set npm registry url
