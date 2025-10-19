@@ -1,0 +1,599 @@
+<script setup lang="ts">
+import { ref, computed, onMounted } from 'vue'
+import type { CSSProperties } from 'vue'
+import { debounce, useResizeObserver, useScroll } from '@/common/utils'
+
+export interface ScrollbarProps {
+  /**
+   * 内容容器的 CSS 类名
+   *
+   * @default undefined
+   */
+  contentClass?: string
+
+  /**
+   * 内容容器的内联样式
+   *
+   * @default {}
+   */
+  contentStyle?: CSSProperties
+
+  /**
+   * 滚动条的尺寸（单位：px）
+   *
+   * @default 5
+   */
+  size?: number
+
+  /**
+   * 滚动条的显示触发方式
+   *
+   * - `'hover'`: 鼠标悬停时显示
+   * - `'none'`: 始终显示
+   *
+   * @default 'hover'
+   */
+  trigger?: 'hover' | 'none'
+
+  /**
+   * 是否自动隐藏滚动条
+   *
+   * @remarks
+   * 仅当 `trigger: 'hover'` 时生效。
+   *
+   * - `true`: 鼠标在滚动区域内且不滚动时自动隐藏，滚动时自动显示；
+   * - `false`: 鼠标在滚动区域内时始终显示，无论是否在滚动。
+   *
+   * @default true
+   */
+  autoHide?: boolean
+
+  /**
+   * 滚动条自动隐藏的延迟时间（单位：ms）
+   *
+   * @remarks
+   * 仅当 `autoHide: true` 时生效。
+   *
+   * @default 500
+   */
+  delay?: number
+
+  /**
+   * 是否启用横向滚动
+   *
+   * @default false
+   */
+  xScrollable?: boolean
+
+  /**
+   * 是否启用纵向滚动
+   *
+   * @default true
+   */
+  yScrollable?: boolean
+
+  /**
+   * 横向滚动条的位置
+   *
+   * - `'top'`: 顶部
+   * - `'bottom'`: 底部
+   *
+   * @default 'bottom'
+   */
+  xPlacement?: 'top' | 'bottom'
+
+  /**
+   * 纵向滚动条的位置
+   *
+   * - `'left'`: 左侧
+   * - `'right'`: 右侧
+   *
+   * @default 'right'
+   */
+  yPlacement?: 'left' | 'right'
+}
+
+const {
+  contentClass = undefined,
+  contentStyle = {},
+  size = 5,
+  trigger = 'hover',
+  autoHide = true,
+  delay = 500,
+  xScrollable = false,
+  yScrollable = true,
+  xPlacement = 'bottom',
+  yPlacement = 'right'
+} = defineProps<ScrollbarProps>()
+
+const containerRef = ref() // 滚动容器 DOM 引用
+const contentRef = ref() // 滚动内容 DOM 引用
+const railVerticalRef = ref() // 垂直滚动条 DOM 引用
+const railHorizontalRef = ref() // 水平滚动条 DOM 引用
+const showYTrack = ref(false) // 是否显示垂直滚动条
+const showXTrack = ref(false) // 是否显示横向滚动条
+const containerScrollHeight = ref(0) // 滚动区域高度，包括溢出高度
+const containerScrollWidth = ref(0) // 滚动区域宽度，包括溢出宽度
+const containerClientHeight = ref(0) // 滚动区域高度，不包括溢出高度
+const containerClientWidth = ref(0) // 滚动区域宽度，不包括溢出宽度
+const containerHeight = ref(0) // 容器高度
+const containerWidth = ref(0) // 容器宽度
+const contentHeight = ref(0) // 内容高度
+const contentWidth = ref(0) // 内容宽度
+const railHeight = ref(0) // 滚动条高度
+const railWidth = ref(0) // 滚动条宽度
+const containerScrollTop = ref(0) // 垂直滚动距离
+const containerScrollLeft = ref(0) // 水平滚动距离
+const mouseEnter = ref(false) // 鼠标是否在滚动区域内
+const trackYPressed = ref(false) // 垂直滚动条是否被按下
+const trackXPressed = ref(false) // 水平滚动条是否被按下
+const mousePressedLeave = ref(false) // 鼠标在按下滚动条并拖动时是否离开滚动区域
+const memoYTop = ref<number>(0) // 鼠标选中并按下垂直滚动条时已滚动的垂直距离
+const memoXLeft = ref<number>(0) // 鼠标选中并按下水平滚动条时已滚动的水平距离
+const memoMouseY = ref<number>(0) // 鼠标选中并按下垂直滚动条时的鼠标 Y 坐标
+const memoMouseX = ref<number>(0) // 鼠标选中并按下水平滚动条时的鼠标 X 坐标
+const horizontalContentStyle = { width: 'fit-content' } // 水平滚动时内容区域默认样式
+const yTrackHover = ref(false) // 鼠标是否在垂直滚动条上
+const xTrackHover = ref(false) // 鼠标是否在水平滚动条上
+const emits = defineEmits(['scroll', 'scrollend'])
+
+const autoShowTrack = computed(() => trigger === 'hover')
+
+// 是否存在垂直滚动
+const isYScroll = computed(() => containerScrollHeight.value > containerClientHeight.value)
+// 是否存在水平滚动
+const isXScroll = computed(() => containerScrollWidth.value > containerClientWidth.value)
+// 是否存在滚动，水平或垂直
+const isScroll = computed(() => {
+  if (containerScrollHeight.value || containerScrollWidth.value) {
+    return (yScrollable && isYScroll.value) || (xScrollable && isXScroll.value)
+  }
+  return true
+})
+// 垂直滚动条高度
+const trackHeight = computed(() => {
+  if (yScrollable && isYScroll.value) {
+    if (containerHeight.value && contentHeight.value && railHeight.value) {
+      const value = Math.min(
+        containerHeight.value,
+        (railHeight.value * containerHeight.value) / contentHeight.value + 1.5 * size
+      )
+      return Number(value.toFixed(4))
+    }
+  }
+  return 0
+})
+// 滚动条垂直偏移
+const trackTop = computed(() => {
+  if (containerHeight.value && contentHeight.value && railHeight.value) {
+    return (
+      (containerScrollTop.value / (contentHeight.value - containerHeight.value)) *
+      (railHeight.value - trackHeight.value)
+    )
+  }
+  return 0
+})
+// 垂直滚动条样式
+const verticalTrackStyle = computed(() => {
+  return {
+    top: `${trackTop.value}px`,
+    height: `${trackHeight.value}px`
+  }
+})
+// 横向滚动条宽度
+const trackWidth = computed(() => {
+  if (xScrollable && isXScroll.value) {
+    if (containerWidth.value && contentWidth.value && railWidth.value) {
+      const value = (railWidth.value * containerWidth.value) / contentWidth.value + 1.5 * size
+      return Number(value.toFixed(4))
+    }
+  }
+  return 0
+})
+// 滚动条水平偏移
+const trackLeft = computed(() => {
+  if (containerWidth.value && contentWidth.value && railWidth.value) {
+    return (
+      (containerScrollLeft.value / (contentWidth.value - containerWidth.value)) *
+      (railWidth.value - trackWidth.value)
+    )
+  }
+  return 0
+})
+// 水平滚动条样式
+const horizontalTrackStyle = computed(() => {
+  return {
+    left: `${trackLeft.value}px`,
+    width: `${trackWidth.value}px`
+  }
+})
+
+onMounted(() => {
+  updateState()
+})
+
+const {
+  left: scrollingLeft,
+  right: scrollingRight,
+  top: scrollingTop,
+  bottom: scrollingBottom
+} = useScroll(containerRef)
+
+useResizeObserver([containerRef, contentRef], updateState)
+
+function updateScrollState(): void {
+  containerScrollTop.value = containerRef.value.scrollTop
+  containerScrollLeft.value = containerRef.value.scrollLeft
+}
+function updateScrollbarState(): void {
+  containerScrollHeight.value = containerRef.value.scrollHeight
+  containerScrollWidth.value = containerRef.value.scrollWidth
+  containerClientHeight.value = containerRef.value.clientHeight
+  containerClientWidth.value = containerRef.value.clientWidth
+  containerHeight.value = containerRef.value.offsetHeight
+  containerWidth.value = containerRef.value.offsetWidth
+  contentHeight.value = contentRef.value.offsetHeight
+  contentWidth.value = contentRef.value.offsetWidth
+  railHeight.value = railVerticalRef.value.offsetHeight
+  railWidth.value = railHorizontalRef.value.offsetWidth
+}
+function updateState(): void {
+  updateScrollState()
+  updateScrollbarState()
+}
+
+const debounceYScrollEnd = debounce(yScrollEnd, 100)
+const debounceXScrollEnd = debounce(xScrollEnd, 100)
+const debounceHideYScrollbar = debounce(hideYScrollbar, 100 + delay)
+const debounceHideXScrollbar = debounce(hideXScrollbar, 100 + delay)
+
+function yScrollEnd(e: Event, direction: 'left' | 'right' | 'top' | 'bottom'): void {
+  emits('scrollend', e, direction)
+}
+function xScrollEnd(e: Event, direction: 'left' | 'right' | 'top' | 'bottom'): void {
+  emits('scrollend', e, direction)
+}
+function hideYScrollbar(): void {
+  if (autoShowTrack.value) {
+    if (autoHide && !yTrackHover.value) {
+      showYTrack.value = false
+    }
+    if (!autoHide && !mouseEnter.value) {
+      showYTrack.value = false
+    }
+  }
+}
+function hideXScrollbar(): void {
+  if (autoShowTrack.value) {
+    if (autoHide && !xTrackHover.value) {
+      showXTrack.value = false
+    }
+    if (!autoHide && !mouseEnter.value) {
+      showXTrack.value = false
+    }
+  }
+}
+function onScroll(e: Event): void {
+  if (scrollingLeft.value || scrollingRight.value) {
+    let direction: string = ''
+    if (scrollingLeft.value) {
+      direction = 'left'
+    }
+    if (scrollingRight.value) {
+      direction = 'right'
+    }
+    emits('scroll', e, direction)
+    if (autoShowTrack.value) {
+      showXTrack.value = true
+      if (!trackXPressed.value && autoHide) {
+        debounceXScrollEnd(e, direction)
+        debounceHideXScrollbar()
+      }
+    }
+  }
+  if (scrollingTop.value || scrollingBottom.value) {
+    let direction: string = ''
+    if (scrollingTop.value) {
+      direction = 'top'
+    }
+    if (scrollingBottom.value) {
+      direction = 'bottom'
+    }
+    emits('scroll', e, direction)
+    if (autoShowTrack.value) {
+      showYTrack.value = true
+      if (!trackYPressed.value && autoHide) {
+        debounceYScrollEnd(e, direction)
+        debounceHideYScrollbar()
+      }
+    }
+  }
+  updateScrollState()
+}
+function onMouseEnter(): void {
+  mouseEnter.value = true
+  if (trackXPressed.value || trackYPressed.value) {
+    mousePressedLeave.value = false
+  } else {
+    if (!autoHide) {
+      showXTrack.value = true
+      showYTrack.value = true
+    }
+  }
+}
+function onMouseLeave(): void {
+  mouseEnter.value = false
+  if (trackXPressed.value || trackYPressed.value) {
+    mousePressedLeave.value = true
+  } else {
+    if (!autoHide) {
+      if (showXTrack.value) {
+        debounceHideXScrollbar()
+      }
+      if (showYTrack.value) {
+        debounceHideYScrollbar()
+      }
+    }
+  }
+}
+function onEnterYTrack(): void {
+  yTrackHover.value = true
+}
+function onLeaveYTrack(): void {
+  yTrackHover.value = false
+  if (!trackYPressed.value) {
+    debounceHideYScrollbar()
+  }
+}
+function onEnterXTrack(): void {
+  xTrackHover.value = true
+}
+function onLeaveXTrack(): void {
+  xTrackHover.value = false
+  if (!trackXPressed.value) {
+    debounceHideXScrollbar()
+  }
+}
+function handleYTrackMouseDown(e: MouseEvent): void {
+  trackYPressed.value = true
+  memoYTop.value = containerScrollTop.value
+  memoMouseY.value = e.clientY
+  document.addEventListener('mousemove', handleYTrackMouseMove)
+  document.addEventListener('mouseup', handleYTrackMouseUp)
+  handleYTrackMouseMove(e)
+}
+function handleYTrackMouseMove(e: MouseEvent): void {
+  const diffY = e.clientY - memoMouseY.value
+  const dScrollTop =
+    (diffY * (contentHeight.value - containerHeight.value)) /
+    (containerHeight.value - trackHeight.value)
+  const toScrollTopUpperBound = contentHeight.value - containerHeight.value
+  let toScrollTop = memoYTop.value + dScrollTop
+  toScrollTop = Math.min(toScrollTopUpperBound, toScrollTop)
+  toScrollTop = Math.max(toScrollTop, 0)
+  containerRef.value.scrollTop = toScrollTop
+}
+function handleYTrackMouseUp(): void {
+  trackYPressed.value = false
+  if (autoShowTrack.value && autoHide && !yTrackHover.value) {
+    debounceHideYScrollbar()
+  } else if (autoShowTrack.value && !autoHide && mousePressedLeave.value) {
+    mousePressedLeave.value = false
+    debounceHideYScrollbar()
+  }
+  document.removeEventListener('mousemove', handleYTrackMouseMove)
+  document.removeEventListener('mouseup', handleYTrackMouseUp)
+}
+function handleXTrackMouseDown(e: MouseEvent): void {
+  trackXPressed.value = true
+  memoXLeft.value = containerScrollLeft.value
+  memoMouseX.value = e.clientX
+  document.addEventListener('mousemove', handleXTrackMouseMove)
+  document.addEventListener('mouseup', handleXTrackMouseUp)
+  handleXTrackMouseMove(e)
+}
+function handleXTrackMouseMove(e: MouseEvent): void {
+  const diffX = e.clientX - memoMouseX.value
+  const dScrollLeft =
+    (diffX * (contentWidth.value - containerWidth.value)) /
+    (containerWidth.value - trackWidth.value)
+  const toScrollLeftUpperBound = contentWidth.value - containerWidth.value
+  let toScrollLeft = memoXLeft.value + dScrollLeft
+  toScrollLeft = Math.min(toScrollLeftUpperBound, toScrollLeft)
+  toScrollLeft = Math.max(toScrollLeft, 0)
+  containerRef.value.scrollLeft = toScrollLeft
+}
+function handleXTrackMouseUp(): void {
+  trackXPressed.value = false
+  if (autoShowTrack.value && autoHide && !xTrackHover.value) {
+    debounceHideXScrollbar()
+  } else if (autoShowTrack.value && !autoHide && mousePressedLeave.value) {
+    mousePressedLeave.value = false
+    debounceHideXScrollbar()
+  }
+  document.removeEventListener('mousemove', handleXTrackMouseMove)
+  document.removeEventListener('mouseup', handleXTrackMouseUp)
+}
+
+function scrollTo(...args: unknown[]): void {
+  containerRef.value?.scrollTo(...args)
+}
+function scrollBy(...args: unknown[]): void {
+  containerRef.value?.scrollBy(...args)
+}
+function getScrollData(): object {
+  return {
+    scrollTop: containerScrollTop.value,
+    scrollWidth: containerScrollWidth.value,
+    scrollHeight: containerScrollHeight.value,
+    clientWidth: containerClientWidth.value,
+    clientHeight: containerClientHeight.value
+  }
+}
+
+defineExpose({
+  scrollTo,
+  scrollBy,
+  getScrollData
+})
+</script>
+
+<template>
+  <div
+    class="scrollbar-wrap"
+    :style="`
+      --scrollbar-width: ${size}px;
+      --scrollbar-height: ${size}px;
+      --scrollbar-border-radius: ${size}px;
+      --scrollbar-color: rgba(0, 0, 0, 0.25);
+      --scrollbar-color-hover: rgba(0, 0, 0, 0.4);
+      --scrollbar-rail-horizontal-top: 4px 2px auto 2px;
+      --scrollbar-rail-horizontal-bottom: auto 2px 4px 2px;
+      --scrollbar-rail-vertical-right: 2px 4px 2px auto;
+      --scrollbar-rail-vertical-left: 2px auto 2px 4px;
+      --scrollbar-rail-color: transparent;
+    `"
+    @mouseenter="isScroll && trigger === 'hover' ? onMouseEnter() : () => false"
+    @mouseleave="isScroll && trigger === 'hover' ? onMouseLeave() : () => false"
+  >
+    <div
+      ref="containerRef"
+      class="scrollbar-container"
+      :class="{ 'container-scroll': isScroll }"
+      @scroll="onScroll"
+    >
+      <div
+        ref="contentRef"
+        class="scrollbar-content"
+        :class="contentClass"
+        :style="[xScrollable ? { ...horizontalContentStyle, ...contentStyle } : contentStyle]"
+      >
+        <slot></slot>
+      </div>
+    </div>
+    <div
+      v-show="yScrollable"
+      ref="railVerticalRef"
+      class="scrollbar-rail rail-vertical"
+      :class="`rail-vertical-${yPlacement}`"
+    >
+      <div
+        class="scrollbar-track"
+        :class="{ 'track-visible': trigger === 'none' || showYTrack }"
+        :style="verticalTrackStyle"
+        @mouseenter="autoShowTrack && autoHide ? onEnterYTrack() : () => false"
+        @mouseleave="autoShowTrack && autoHide ? onLeaveYTrack() : () => false"
+        @mousedown.prevent.stop="handleYTrackMouseDown"
+      ></div>
+    </div>
+    <div
+      v-show="xScrollable"
+      ref="railHorizontalRef"
+      class="scrollbar-rail rail-horizontal"
+      :class="`rail-horizontal-${xPlacement}`"
+    >
+      <div
+        class="scrollbar-track"
+        :class="{ 'track-visible': trigger === 'none' || showXTrack }"
+        :style="horizontalTrackStyle"
+        @mouseenter="autoShowTrack && autoHide ? onEnterXTrack() : () => false"
+        @mouseleave="autoShowTrack && autoHide ? onLeaveXTrack() : () => false"
+        @mousedown.prevent.stop="handleXTrackMouseDown"
+      ></div>
+    </div>
+  </div>
+</template>
+
+<style lang="less" scoped>
+.scrollbar-wrap {
+  overflow: hidden;
+  position: relative;
+  z-index: auto;
+  height: 100%;
+  width: 100%;
+  .scrollbar-container {
+    width: 100%;
+    height: 100%;
+    min-height: inherit;
+    max-height: inherit;
+    scrollbar-width: none;
+    &::-webkit-scrollbar,
+    &::-webkit-scrollbar-track-piece,
+    &::-webkit-scrollbar-thumb {
+      width: 0;
+      height: 0;
+      display: none;
+    }
+    .scrollbar-content {
+      box-sizing: border-box;
+      min-width: 100%;
+      &::after,
+      &::before {
+        content: '';
+        display: block;
+      }
+    }
+  }
+  .container-scroll {
+    overflow: scroll;
+  }
+  .scrollbar-rail {
+    position: absolute;
+    pointer-events: none;
+    user-select: none;
+    background: var(--scrollbar-rail-color);
+    -webkit-user-select: none;
+    .scrollbar-track {
+      z-index: 9;
+      position: absolute;
+      cursor: pointer;
+      opacity: 0;
+      pointer-events: none;
+      background-color: var(--scrollbar-color);
+      transition:
+        background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1),
+        opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      &:hover {
+        background-color: var(--scrollbar-color-hover);
+      }
+    }
+    .track-visible {
+      opacity: 1;
+      pointer-events: all;
+    }
+  }
+  .rail-vertical {
+    width: var(--scrollbar-width);
+    .scrollbar-track {
+      width: var(--scrollbar-width);
+      border-radius: var(--scrollbar-border-radius);
+      bottom: 0;
+    }
+  }
+  .rail-vertical-left {
+    inset: var(--scrollbar-rail-vertical-left);
+  }
+  .rail-vertical-right {
+    inset: var(--scrollbar-rail-vertical-right);
+  }
+  .rail-horizontal {
+    height: var(--scrollbar-height);
+    .scrollbar-track {
+      height: var(--scrollbar-height);
+      border-radius: var(--scrollbar-border-radius);
+      right: 0;
+    }
+  }
+  .rail-horizontal-top {
+    inset: var(--scrollbar-rail-horizontal-top);
+  }
+  .rail-horizontal-bottom {
+    inset: var(--scrollbar-rail-horizontal-bottom);
+  }
+  .scrollbar-thumb {
+    position: absolute;
+    background-color: rgba(0, 0, 0, 0.5);
+    transition: background-color 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+}
+</style>
