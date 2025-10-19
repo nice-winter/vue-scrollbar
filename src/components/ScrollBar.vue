@@ -108,10 +108,10 @@ const {
 
 const slots = useSlots()
 
-const containerRef = ref() // 滚动容器 DOM 引用
-const contentRef = ref() // 滚动内容 DOM 引用
-const railVerticalRef = ref() // 垂直滚动条 DOM 引用
-const railHorizontalRef = ref() // 水平滚动条 DOM 引用
+const containerRef = ref<HTMLElement>() // 滚动容器 DOM 引用
+const contentRef = ref<HTMLElement>() // 滚动内容 DOM 引用
+const railVerticalRef = ref<HTMLElement>() // 垂直滚动条 DOM 引用
+const railHorizontalRef = ref<HTMLElement>() // 水平滚动条 DOM 引用
 
 const showYTrack = ref(false) // 是否显示垂直滚动条
 const showXTrack = ref(false) // 是否显示横向滚动条
@@ -225,20 +225,20 @@ const {
 useResizeObserver([containerRef, contentRef], updateState)
 
 function updateScrollState(): void {
-  containerScrollTop.value = containerRef.value.scrollTop
-  containerScrollLeft.value = containerRef.value.scrollLeft
+  containerScrollTop.value = containerRef.value?.scrollTop || 0
+  containerScrollLeft.value = containerRef.value?.scrollLeft || 0
 }
 function updateScrollBarState(): void {
-  containerScrollHeight.value = containerRef.value.scrollHeight
-  containerScrollWidth.value = containerRef.value.scrollWidth
-  containerClientHeight.value = containerRef.value.clientHeight
-  containerClientWidth.value = containerRef.value.clientWidth
-  containerHeight.value = containerRef.value.offsetHeight
-  containerWidth.value = containerRef.value.offsetWidth
-  contentHeight.value = contentRef.value.offsetHeight
-  contentWidth.value = contentRef.value.offsetWidth
-  railHeight.value = railVerticalRef.value.offsetHeight
-  railWidth.value = railHorizontalRef.value.offsetWidth
+  containerScrollHeight.value = containerRef.value?.scrollHeight || 0
+  containerScrollWidth.value = containerRef.value?.scrollWidth || 0
+  containerClientHeight.value = containerRef.value?.clientHeight || 0
+  containerClientWidth.value = containerRef.value?.clientWidth || 0
+  containerHeight.value = containerRef.value?.offsetHeight || 0
+  containerWidth.value = containerRef.value?.offsetWidth || 0
+  contentHeight.value = contentRef.value?.offsetHeight || 0
+  contentWidth.value = contentRef.value?.offsetWidth || 0
+  railHeight.value = railVerticalRef.value?.offsetHeight || 0
+  railWidth.value = railHorizontalRef.value?.offsetWidth || 0
 }
 function updateState(): void {
   updateScrollState()
@@ -374,7 +374,7 @@ function handleYTrackMouseMove(e: MouseEvent): void {
   let toScrollTop = memoYTop.value + dScrollTop
   toScrollTop = Math.min(toScrollTopUpperBound, toScrollTop)
   toScrollTop = Math.max(toScrollTop, 0)
-  containerRef.value.scrollTop = toScrollTop
+  if (containerRef.value) containerRef.value.scrollTop = toScrollTop
 }
 function handleYTrackMouseUp(): void {
   trackYPressed.value = false
@@ -404,7 +404,7 @@ function handleXTrackMouseMove(e: MouseEvent): void {
   let toScrollLeft = memoXLeft.value + dScrollLeft
   toScrollLeft = Math.min(toScrollLeftUpperBound, toScrollLeft)
   toScrollLeft = Math.max(toScrollLeft, 0)
-  containerRef.value.scrollLeft = toScrollLeft
+  if (containerRef.value) containerRef.value.scrollLeft = toScrollLeft
 }
 function handleXTrackMouseUp(): void {
   trackXPressed.value = false
@@ -418,10 +418,10 @@ function handleXTrackMouseUp(): void {
   document.removeEventListener('mouseup', handleXTrackMouseUp)
 }
 
-function scrollTo(...args: unknown[]): void {
+function scrollTo(...args: ScrollToOptions[]): void {
   containerRef.value?.scrollTo(...args)
 }
-function scrollBy(...args: unknown[]): void {
+function scrollBy(...args: ScrollToOptions[]): void {
   containerRef.value?.scrollBy(...args)
 }
 function getScrollData(): object {
