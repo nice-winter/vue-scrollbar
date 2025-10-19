@@ -7,12 +7,28 @@ import vueDevTools from 'vite-plugin-vue-devtools'
 import AutoImport from 'unplugin-auto-import/vite'
 import Components from 'unplugin-vue-components/vite'
 import { VueRouterAutoImports } from 'unplugin-vue-router'
+import dts from 'unplugin-dts/vite'
 
 // https://vite.dev/config/
 export default defineConfig({
   server: {
     host: '0.0.0.0',
     strictPort: true
+  },
+  build: {
+    lib: {
+      entry: fileURLToPath(new URL('./src/index.ts', import.meta.url)),
+      name: 'VueScrollBar',
+      fileName: 'vue-scrollbar'
+    },
+    rolldownOptions: {
+      external: ['vue'],
+      output: {
+        globals: {
+          vue: 'Vue'
+        }
+      }
+    }
   },
   plugins: [
     vueRouter({
@@ -28,7 +44,12 @@ export default defineConfig({
       dts: 'src/types/components.d.ts',
       resolvers: []
     }),
-    vueDevTools()
+    vueDevTools(),
+    dts({
+      tsconfigPath: './tsconfig.app.json',
+      bundleTypes: true,
+      processor: 'vue'
+    })
   ],
   resolve: {
     alias: {

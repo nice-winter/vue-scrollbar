@@ -1,8 +1,18 @@
 {
-  "name": "@pkgtoolsjs/template-vue-ts",
-  "version": "0.0.0",
-  "private": true,
+  "name": "@nice-winter/vue-scrollbar",
+  "version": "0.0.1",
+  "private": false,
   "type": "module",
+  "main": "./dist/vue-scrollbar.umd.cjs",
+  "module": "./dist/vue-scrollbar.js",
+  "exports": {
+    ".": {
+      "import": "./dist/vue-scrollbar.js",
+      "require": "./dist/vue-scrollbar.umd.cjs",
+      "types": "./dist/vue-scrollbar.d.ts"
+    },
+    "./style.css": "./dist/vue-scrollbar.css"
+  },
   "scripts": {
     "postinstall": "node -e \"try{require('./scripts/postinstall.js')}catch(e){}\"",
     "dev": "vite",
@@ -26,11 +36,14 @@
       "prettier --parser=typescript --write"
     ]
   },
-  "author": "pkgtoolsjs",
+  "author": "nice-winter",
   "repository": {
-    "url": "git+https://github.com/pkgtoolsjs/template-vue-ts.git"
+    "url": "git+https://github.com/nice-winter/vue-scrollbar.git"
   },
   "license": "MIT",
+  "peerDependencies": {
+    "vue": "^3.5.0"
+  },
   "dependencies": {
     "@vueuse/core": "^14.0.0-beta.1",
     "pinia": "^3.0.3",
@@ -38,6 +51,7 @@
     "vue-router": "^4.6.3"
   },
   "devDependencies": {
+    "@microsoft/api-extractor": "^7.53.1",
     "@tsconfig/node24": "^24.0.1",
     "@types/jsdom": "^27.0.0",
     "@types/node": "^24.8.1",
@@ -46,6 +60,7 @@
     "@vitest/eslint-plugin": "^1.3.23",
     "@vue/eslint-config-prettier": "^10.2.0",
     "@vue/eslint-config-typescript": "^14.6.0",
+    "@vue/language-core": "^3.1.1",
     "@vue/test-utils": "^2.4.6",
     "@vue/tsconfig": "^0.8.1",
     "eslint": "^9.38.0",
@@ -61,6 +76,7 @@
     "simple-git-hooks": "^2.13.1",
     "typescript": "~5.9.3",
     "unplugin-auto-import": "^20.2.0",
+    "unplugin-dts": "^1.0.0-beta.6",
     "unplugin-vue-components": "^29.1.0",
     "unplugin-vue-router": "^0.16.0",
     "vite": "npm:rolldown-vite@latest",
