@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, withModifiers } from 'vue'
 import type { CSSProperties } from 'vue'
 import { debounce, useResizeObserver, useScroll } from '@/common/utils'
 
@@ -106,10 +106,13 @@ const {
   yPlacement = 'right'
 } = defineProps<ScrollBarProps>()
 
+const slots = useSlots()
+
 const containerRef = ref() // 滚动容器 DOM 引用
 const contentRef = ref() // 滚动内容 DOM 引用
 const railVerticalRef = ref() // 垂直滚动条 DOM 引用
 const railHorizontalRef = ref() // 水平滚动条 DOM 引用
+
 const showYTrack = ref(false) // 是否显示垂直滚动条
 const showXTrack = ref(false) // 是否显示横向滚动条
 const containerScrollHeight = ref(0) // 滚动区域高度，包括溢出高度
@@ -436,76 +439,111 @@ defineExpose({
   scrollBy,
   getScrollData
 })
+
+const render = () => {
+  const defaultSlot = slots.default ? slots.default() : []
+  const container = defaultSlot[0]
+
+  if (container?.children) {
+    const scrollContentWrapper = h(
+      'div',
+      {
+        ref: containerRef,
+        class: ['scrollbar-container', isScroll.value ? 'container-scroll' : null],
+        onScroll: onScroll
+      },
+      h(
+        'div',
+        {
+          ref: contentRef,
+          class: ['scrollbar-content', contentClass],
+          style: [xScrollable ? { ...horizontalContentStyle, ...contentStyle } : contentStyle]
+        },
+        container.children
+      )
+    )
+
+    const YScrollable = h(
+      'div',
+      {
+        ref: railVerticalRef,
+        class: ['scrollbar-rail', 'rail-vertical', `rail-vertical-${yPlacement}`],
+        style: { display: yScrollable ? `block` : `none` }
+      },
+      h('div', {
+        class: ['scrollbar-track', trigger === 'none' || showYTrack.value ? 'track-visible' : null],
+        style: verticalTrackStyle.value,
+        onMouseenter: autoShowTrack.value && autoHide ? onEnterYTrack : () => false,
+        onMouseleave: autoShowTrack.value && autoHide ? onLeaveYTrack : () => false,
+        onMousedown: withModifiers(
+          (e) => handleYTrackMouseDown(e as MouseEvent),
+          ['prevent', 'stop']
+        )
+      })
+    )
+
+    const XScrollable = h(
+      'div',
+      {
+        ref: railHorizontalRef,
+        class: ['scrollbar-rail', 'rail-horizontal', `rail-horizontal-${xPlacement}`],
+        style: { display: xScrollable ? `block` : `none` }
+      },
+      h('div', {
+        class: ['scrollbar-track', trigger === 'none' || showXTrack.value ? 'track-visible' : null],
+        style: horizontalTrackStyle.value,
+        onMouseenter: autoShowTrack.value && autoHide ? onEnterXTrack : () => false,
+        onMouseleave: autoShowTrack.value && autoHide ? onLeaveXTrack : () => false,
+        onMousedown: withModifiers(
+          (e) => handleXTrackMouseDown(e as MouseEvent),
+          ['prevent', 'stop']
+        )
+      })
+    )
+
+    const containerStyle = `
+          --scrollbar-width: ${size}px;
+          --scrollbar-height: ${size}px;
+          --scrollbar-border-radius: ${size}px;
+          --scrollbar-color: rgba(0, 0, 0, 0.25);
+          --scrollbar-color-hover: rgba(0, 0, 0, 0.4);
+          --scrollbar-rail-horizontal-top: 4px 2px auto 2px;
+          --scrollbar-rail-horizontal-bottom: auto 2px 4px 2px;
+          --scrollbar-rail-vertical-right: 2px 4px 2px auto;
+          --scrollbar-rail-vertical-left: 2px auto 2px 4px;
+          --scrollbar-rail-color: transparent;
+        `
+
+    return h(
+      container,
+      {
+        ...container.props,
+        class: [container.props?.class, 'with-vue-scrollbar'].filter(Boolean).join(' '),
+        style: {
+          ...container.props?.style,
+          ...Object.fromEntries(
+            containerStyle
+              .split(';')
+              .filter((item) => item)
+              .map((item) => item.split(':').map((part) => part.trim()))
+              .filter((item) => item[0])
+          )
+        },
+        onMouseenter: isScroll.value && trigger === 'hover' ? onMouseEnter : () => false,
+        onMouseleave: isScroll.value && trigger === 'hover' ? onMouseLeave : () => false
+      },
+      [scrollContentWrapper, YScrollable, XScrollable]
+    )
+  }
+}
 </script>
 
 <template>
-  <div
-    class="scrollbar-wrap"
-    :style="`
-      --scrollbar-width: ${size}px;
-      --scrollbar-height: ${size}px;
-      --scrollbar-border-radius: ${size}px;
-      --scrollbar-color: rgba(0, 0, 0, 0.25);
-      --scrollbar-color-hover: rgba(0, 0, 0, 0.4);
-      --scrollbar-rail-horizontal-top: 4px 2px auto 2px;
-      --scrollbar-rail-horizontal-bottom: auto 2px 4px 2px;
-      --scrollbar-rail-vertical-right: 2px 4px 2px auto;
-      --scrollbar-rail-vertical-left: 2px auto 2px 4px;
-      --scrollbar-rail-color: transparent;
-    `"
-    @mouseenter="isScroll && trigger === 'hover' ? onMouseEnter() : () => false"
-    @mouseleave="isScroll && trigger === 'hover' ? onMouseLeave() : () => false"
-  >
-    <div
-      ref="containerRef"
-      class="scrollbar-container"
-      :class="{ 'container-scroll': isScroll }"
-      @scroll="onScroll"
-    >
-      <div
-        ref="contentRef"
-        class="scrollbar-content"
-        :class="contentClass"
-        :style="[xScrollable ? { ...horizontalContentStyle, ...contentStyle } : contentStyle]"
-      >
-        <slot></slot>
-      </div>
-    </div>
-    <div
-      v-show="yScrollable"
-      ref="railVerticalRef"
-      class="scrollbar-rail rail-vertical"
-      :class="`rail-vertical-${yPlacement}`"
-    >
-      <div
-        class="scrollbar-track"
-        :class="{ 'track-visible': trigger === 'none' || showYTrack }"
-        :style="verticalTrackStyle"
-        @mouseenter="autoShowTrack && autoHide ? onEnterYTrack() : () => false"
-        @mouseleave="autoShowTrack && autoHide ? onLeaveYTrack() : () => false"
-        @mousedown.prevent.stop="handleYTrackMouseDown"
-      ></div>
-    </div>
-    <div
-      v-show="xScrollable"
-      ref="railHorizontalRef"
-      class="scrollbar-rail rail-horizontal"
-      :class="`rail-horizontal-${xPlacement}`"
-    >
-      <div
-        class="scrollbar-track"
-        :class="{ 'track-visible': trigger === 'none' || showXTrack }"
-        :style="horizontalTrackStyle"
-        @mouseenter="autoShowTrack && autoHide ? onEnterXTrack() : () => false"
-        @mouseleave="autoShowTrack && autoHide ? onLeaveXTrack() : () => false"
-        @mousedown.prevent.stop="handleXTrackMouseDown"
-      ></div>
-    </div>
-  </div>
+  <render />
 </template>
 
-<style lang="less" scoped>
-.scrollbar-wrap {
+<style lang="less">
+.with-vue-scrollbar {
   overflow: hidden;
   position: relative;
   z-index: auto;
