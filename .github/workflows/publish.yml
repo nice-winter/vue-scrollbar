@@ -61,6 +61,9 @@ jobs:
           name: dist
           path: .
 
+      - name: Show files
+        run: ls -l
+
       - name: Set npm registry url
         uses: actions/setup-node@v5
         with:
