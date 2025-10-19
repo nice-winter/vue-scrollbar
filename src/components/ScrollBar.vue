@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, withModifiers } from 'vue'
+import { h, ref, computed, onMounted, useSlots, withModifiers } from 'vue'
 import type { CSSProperties } from 'vue'
 import { debounce, useResizeObserver, useScroll } from '@/common/utils'
 
