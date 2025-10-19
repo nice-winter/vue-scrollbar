@@ -59,7 +59,7 @@ jobs:
         uses: actions/download-artifact@v5
         with:
           name: dist
-          path: .
+          path: dist
 
       - name: Show files
         run: ls -l
