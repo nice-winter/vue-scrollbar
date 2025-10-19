@@ -3,7 +3,7 @@ import { ref, computed, onMounted } from 'vue'
 import type { CSSProperties } from 'vue'
 import { debounce, useResizeObserver, useScroll } from '@/common/utils'
 
-export interface ScrollbarProps {
+export interface ScrollBarProps {
   /**
    * 内容容器的 CSS 类名
    *
@@ -104,7 +104,7 @@ const {
   yScrollable = true,
   xPlacement = 'bottom',
   yPlacement = 'right'
-} = defineProps<ScrollbarProps>()
+} = defineProps<ScrollBarProps>()
 
 const containerRef = ref() // 滚动容器 DOM 引用
 const contentRef = ref() // 滚动内容 DOM 引用
@@ -225,7 +225,7 @@ function updateScrollState(): void {
   containerScrollTop.value = containerRef.value.scrollTop
   containerScrollLeft.value = containerRef.value.scrollLeft
 }
-function updateScrollbarState(): void {
+function updateScrollBarState(): void {
   containerScrollHeight.value = containerRef.value.scrollHeight
   containerScrollWidth.value = containerRef.value.scrollWidth
   containerClientHeight.value = containerRef.value.clientHeight
@@ -239,13 +239,13 @@ function updateScrollbarState(): void {
 }
 function updateState(): void {
   updateScrollState()
-  updateScrollbarState()
+  updateScrollBarState()
 }
 
 const debounceYScrollEnd = debounce(yScrollEnd, 100)
 const debounceXScrollEnd = debounce(xScrollEnd, 100)
-const debounceHideYScrollbar = debounce(hideYScrollbar, 100 + delay)
-const debounceHideXScrollbar = debounce(hideXScrollbar, 100 + delay)
+const debounceHideYScrollBar = debounce(hideYScrollBar, 100 + delay)
+const debounceHideXScrollBar = debounce(hideXScrollBar, 100 + delay)
 
 function yScrollEnd(e: Event, direction: 'left' | 'right' | 'top' | 'bottom'): void {
   emits('scrollend', e, direction)
@@ -253,7 +253,7 @@ function yScrollEnd(e: Event, direction: 'left' | 'right' | 'top' | 'bottom'): v
 function xScrollEnd(e: Event, direction: 'left' | 'right' | 'top' | 'bottom'): void {
   emits('scrollend', e, direction)
 }
-function hideYScrollbar(): void {
+function hideYScrollBar(): void {
   if (autoShowTrack.value) {
     if (autoHide && !yTrackHover.value) {
       showYTrack.value = false
@@ -263,7 +263,7 @@ function hideYScrollbar(): void {
     }
   }
 }
-function hideXScrollbar(): void {
+function hideXScrollBar(): void {
   if (autoShowTrack.value) {
     if (autoHide && !xTrackHover.value) {
       showXTrack.value = false
@@ -287,7 +287,7 @@ function onScroll(e: Event): void {
       showXTrack.value = true
       if (!trackXPressed.value && autoHide) {
         debounceXScrollEnd(e, direction)
-        debounceHideXScrollbar()
+        debounceHideXScrollBar()
       }
     }
   }
@@ -304,7 +304,7 @@ function onScroll(e: Event): void {
       showYTrack.value = true
       if (!trackYPressed.value && autoHide) {
         debounceYScrollEnd(e, direction)
-        debounceHideYScrollbar()
+        debounceHideYScrollBar()
       }
     }
   }
@@ -328,10 +328,10 @@ function onMouseLeave(): void {
   } else {
     if (!autoHide) {
       if (showXTrack.value) {
-        debounceHideXScrollbar()
+        debounceHideXScrollBar()
       }
       if (showYTrack.value) {
-        debounceHideYScrollbar()
+        debounceHideYScrollBar()
       }
     }
   }
@@ -342,7 +342,7 @@ function onEnterYTrack(): void {
 function onLeaveYTrack(): void {
   yTrackHover.value = false
   if (!trackYPressed.value) {
-    debounceHideYScrollbar()
+    debounceHideYScrollBar()
   }
 }
 function onEnterXTrack(): void {
@@ -351,7 +351,7 @@ function onEnterXTrack(): void {
 function onLeaveXTrack(): void {
   xTrackHover.value = false
   if (!trackXPressed.value) {
-    debounceHideXScrollbar()
+    debounceHideXScrollBar()
   }
 }
 function handleYTrackMouseDown(e: MouseEvent): void {
@@ -376,10 +376,10 @@ function handleYTrackMouseMove(e: MouseEvent): void {
 function handleYTrackMouseUp(): void {
   trackYPressed.value = false
   if (autoShowTrack.value && autoHide && !yTrackHover.value) {
-    debounceHideYScrollbar()
+    debounceHideYScrollBar()
   } else if (autoShowTrack.value && !autoHide && mousePressedLeave.value) {
     mousePressedLeave.value = false
-    debounceHideYScrollbar()
+    debounceHideYScrollBar()
   }
   document.removeEventListener('mousemove', handleYTrackMouseMove)
   document.removeEventListener('mouseup', handleYTrackMouseUp)
@@ -406,10 +406,10 @@ function handleXTrackMouseMove(e: MouseEvent): void {
 function handleXTrackMouseUp(): void {
   trackXPressed.value = false
   if (autoShowTrack.value && autoHide && !xTrackHover.value) {
-    debounceHideXScrollbar()
+    debounceHideXScrollBar()
   } else if (autoShowTrack.value && !autoHide && mousePressedLeave.value) {
     mousePressedLeave.value = false
-    debounceHideXScrollbar()
+    debounceHideXScrollBar()
   }
   document.removeEventListener('mousemove', handleXTrackMouseMove)
   document.removeEventListener('mouseup', handleXTrackMouseUp)
